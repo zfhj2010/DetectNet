@@ -1,10 +1,13 @@
+import os
 import cv2
+import struct
 import numpy as np
 import os.path as osp
 import tensorflow as tf
 import matplotlib.pyplot as plt
 from Config import cfg
 from MyNMS import zsoft_nms
+import socket
 
 
 def init_detect():
@@ -12,12 +15,12 @@ def init_detect():
     model_file = osp.join(model_path, 'model.ckpt')
     if not osp.isfile(model_file + '.meta'):
         raise IOError('{:s} not found.\n'.format(model_file + '.meta'))
-    with tf.device('/cpu:0'):
-        tfconfig = tf.ConfigProto(log_device_placement=True)
-        sess = tf.Session(config=tfconfig)
-        saver = tf.train.import_meta_graph(model_file + '.meta')
-        saver.restore(sess, model_file)
-        def_gh = tf.get_default_graph()
+    # with tf.device('/cpu:0'):
+    tfconfig = tf.ConfigProto(log_device_placement=True)
+    sess = tf.Session(config=tfconfig)
+    saver = tf.train.import_meta_graph(model_file + '.meta')
+    saver.restore(sess, model_file)
+    def_gh = tf.get_default_graph()
 
     return sess, def_gh
 
@@ -178,9 +181,39 @@ def _vis_detections(im, class_name, dets, thresh=0.5):
     plt.draw()
 
 
+def recv_data(connection):
+    connection.recv(2)
+    cmd_buf = connection.recv(2)
+    cmd = int.from_bytes(cmd_buf, byteorder='little')
+    connection.recv(4)
+    return cmd
+
+
 if __name__ == '__main__':
     sess, def_graph = init_detect()
-    im_list = ['01.jpg']
-    for im_path in im_list:
-        im = cv2.imread(im_path)
-        image_detect(sess, def_graph, im)
+    im = cv2.imread('04.jpg')
+    image_detect(sess, def_graph, im)
+
+    # sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    # sock.bind(('127.0.0.1', 23456))
+    # sock.listen(1)
+    # conn, address = sock.accept()
+    # while True:
+    #     cmd = recv_data(conn)
+    #     if cmd == 1:
+    #         im = cv2.imread('/home/robot/detect.jpg')
+    #         boxes = image_detect(sess, def_graph, im)
+    #         os.remove('/home/robot/detect.jpg')
+    #         data = struct.pack('HHI', 0xAA55, cmd, 16)
+    #         conn.send(data)
+    #         if len(boxes) > 0:
+    #             data = struct.pack('ffff', boxes[0][0], boxes[0][1], boxes[0][2], boxes[0][3])
+    #         else:
+    #             data = struct.pack('ffff', -1.0, -1.0, -1.0, -1.0)
+    #         conn.send(data)
+    #     elif cmd == 2:
+    #         conn.close()
+    #         sock.close()
+    #         break
+
+
